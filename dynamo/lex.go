@@ -201,6 +201,19 @@ func (l *dynLex) acceptRun(valid string) {
 	l.backup()
 }
 
+// insertEmit adds a token of given type and value to the output
+// stream.  It does not call ignore(), it does not perform semicolon
+// insertion, it does not pass go.
+func (l *dynLex) insertEmit(ty itemType, val string) {
+	t := Token{
+		pos:  l.f.Pos(l.pos),
+		val:  val,
+		kind: ty,
+	}
+	l.last = t
+	l.items <- t
+}
+
 func (l *dynLex) emit(ty itemType) {
 	t := Token{
 		pos:  l.f.Pos(l.pos),
@@ -249,10 +262,6 @@ func (l *dynLex) statement() stateFn {
 			l.next()
 			return l.comment
 		}
-		if l.peek() == '*' {
-			l.next()
-			return l.multiComment
-		}
 		l.emit(itemOperator)
 	case r == '`':
 		return l.lexType
@@ -264,6 +273,9 @@ func (l *dynLex) statement() stateFn {
 		}
 		//		log.Print("1 ignoring:", l.s[l.start:l.pos])
 		l.ignore()
+	case r == 'n' || r == 'N' && l.isNoteStart(r):
+		l.backup()
+		return l.comment
 	case unicode.IsDigit(r) || r == '.':
 		l.backup()
 		return l.number
@@ -300,6 +312,9 @@ func (l *dynLex) operator() stateFn {
 		ty = itemRSquare
 	}
 	l.emit(ty)
+	if r == ')' && l.peek() == '(' {
+		l.insertEmit(itemOperator, "*")
+	}
 	return l.statement
 }
 
@@ -403,6 +418,10 @@ func (l *dynLex) identifier() stateFn {
 
 func isLiteralStart(r rune) bool {
 	return r == '"'
+}
+
+func (l *dynLex) isNoteStart(r rune) bool {
+	return len(l.s[l.start:]) >= 4 && strings.ToUpper(l.s[l.start:l.start+4]) == "NOTE"
 }
 
 func isOperator(r rune) bool {
