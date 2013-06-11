@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/bpowers/boosd/boosd"
+	"github.com/bpowers/dynamo/dynamo"
 	"go/ast"
 	"go/format"
 	"go/token"
@@ -120,7 +120,7 @@ func transliterate(name string, in io.Reader) ([]byte, error) {
 	fsetFile := fset.AddFile(name, fset.Base(), len(mdlSrc))
 
 	// and parse
-	pkg, err := boosd.Parse(fsetFile, string(mdlSrc))
+	pkg, err := dynamo.Parse(fsetFile, fset, string(mdlSrc))
 	if err != nil {
 		return nil, fmt.Errorf("Parse(%v): %s", name, err)
 	}
@@ -128,7 +128,7 @@ func transliterate(name string, in io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("There were errors parsing the file")
 	}
 
-	goSource, err := boosd.GenGo(pkg)
+	goSource, err := dynamo.GenGo(pkg)
 	if err != nil {
 		log.Fatalf("GenGo(%v): %s", pkg, err)
 	}
@@ -344,22 +344,24 @@ function compileUpdate() {
 </html>
 `
 
-var helloWorld = []byte(`// exponential growth
-main model {
-        timespec = {
-                start:     0
-                end:       50
-                dt:        .1
-                save_step: 1
-        }
-
-        // 7% growth is a 10 year doubling time.
-        rate = .07
-        in flow = rate * accum
-
-        accum stock = {
-                initial: 200
-                inflow: in
-        }
-}
+var helloWorld = []byte(`*
+NOTE	House5 -- Three sector urban model with housing filter down
+NOTE
+NOTE	Population Sector
+NOTE
+L	POP.K=POP.J+(DT)(B.JK-D.JK+NM.JK+NM.JK-OM.JK)
+N	POP=POPN
+C	POPN=133000
+R	B.KL=(NB)(POP.K)
+C	ND=0.01
+R	IM.KL=(IMN)(AM.K)(POP.K)
+C	IMN=.01
+A	AM.K=(AJM.K)(AHM.K)
+A	AHM.K=TABHL(AHMT,HAR.K,.4,1.4,.2)
+T	AHMT=2/2/1.6/1/.2/.005
+A	AJM.K=TABHL(AJMT,LJR.K,.5,1.2,.1)
+T	AJMT=2/2/1.87/1.6/1.25/1/.3/.05
+R	OM.KL=(OMN)(DM.K)(POP.K)
+C	OMN=.01
+A	DM.K=MIN((1/OMN,(1/AM.K)))
 `)
