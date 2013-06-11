@@ -87,6 +87,11 @@ type Token struct {
 	kind itemType
 }
 
+// gross
+func (t Token) Exists() bool {
+	return t.val != "" && t.kind != itemType(0) && t.pos != token.Pos(0)
+}
+
 func (t Token) String() string {
 	val := t.val
 	if t.kind == itemSemi {
@@ -98,18 +103,32 @@ func (t Token) String() string {
 type stateFn func() stateFn
 
 type dynLex struct {
-	f     *token.File
-	s     string // the string being scanned
-	pos   int    // current position in the input
-	start int    // start of this token
-	width int    // width of the last rune
-	last  Token
-	items chan Token // channel of scanned items
-	state stateFn
-	semi  bool
+	f      *token.File
+	s      string // the string being scanned
+	pos    int    // current position in the input
+	start  int    // start of this token
+	width  int    // width of the last rune
+	last   Token
+	items  chan Token // channel of scanned items
+	state  stateFn
+	semi   bool
+	peeked Token
 }
 
+func (l *dynLex) Peek() Token {
+	if !l.peeked.Exists() {
+		l.peeked = l.Token()
+	}
+	return l.peeked
+}
+
+// n=1 lookahead
 func (l *dynLex) Token() Token {
+	if l.peeked.Exists() {
+		p := l.peeked
+		l.peeked = Token{}
+		return p
+	}
 	for {
 		select {
 		case item := <-l.items:
