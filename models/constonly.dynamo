@@ -1,0 +1,12 @@
+*
+NOTE	House5 -- Three sector urban model with housing filter down
+NOTE
+NOTE	Population Sector
+NOTE
+C	POPN=133000
+C	OMN=.01
+NOTE
+NOTE	control cards
+NOTE
+C	LENGTH=250
+C	DT=5
