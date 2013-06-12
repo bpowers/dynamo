@@ -7,6 +7,7 @@ package dynamo
 import (
 	"bytes"
 	"fmt"
+	"github.com/bpowers/boosd/runtime"
 	"go/token"
 	"strings"
 )
@@ -61,23 +62,101 @@ func (p *dynParser) declModel(n *Ident) {
 	m := new(ModelDecl)
 	m.Name = n
 	m.Body = new(BlockStmt)
-
+outer:
 	for {
-		tok := p.lex.Peek()
-		if tok.kind == itemIdentifier && len(tok.val) == 1 {
-			p.stmtInto(m)
-		} else {
+		switch tok := p.lex.Peek(); tok.kind {
+		case itemEOF:
+			break outer
+		case itemSemi:
+			p.lex.Token() // discard
+		case itemIdentifier:
+			if len(tok.val) == 1 {
+				p.stmtInto(m)
+				break
+			}
+			fallthrough
+		default:
 			p.errorf(tok, "expected 1 char ident, not '%s'", tok.val)
-			break
+			p.lex.Token() // discard
 		}
 	}
+
+	if n.Name == "main" {
+		if err := extractTimespec(m); err != nil {
+			p.errorf(Token{}, "extractTimespec: %s", err)
+		}
+	}
+
+	p.f.Decls = append(p.f.Decls, m)
+}
+
+func floatLit(f float64) *BasicLit {
+	// FIXME: be more precise or something
+	return &BasicLit{Kind: token.FLOAT, Value: fmt.Sprintf("%f", f)}
+}
+
+func extractTimespec(m *ModelDecl) error {
+	ts := new(AssignStmt)
+	ts.Lhs = new(VarDecl)
+	ts.Lhs.Name = id("timespec")
+	rhs := new(CompositeLit)
+	ts.Rhs = rhs
+
+	spec := runtime.Timespec{
+		DT:       1,
+		SaveStep: 1,
+	}
+
+	for _, stmt := range m.Body.List {
+		assign, ok := stmt.(*AssignStmt)
+		if !ok {
+			continue
+		}
+		var err error
+		switch strings.ToUpper(assign.Lhs.Name.Name) {
+		case "TIME":
+			spec.Start, err = constEval(assign.Rhs)
+		case "LENGTH":
+			spec.End, err = constEval(assign.Rhs)
+		case "SAVPER":
+			spec.SaveStep, err = constEval(assign.Rhs)
+		case "DT":
+			spec.DT, err = constEval(assign.Rhs)
+		}
+		if err != nil {
+			return fmt.Errorf("constEval(%s): %s", assign.Lhs.Name.Name, err)
+		}
+	}
+
+	// remove these const assignments from the simulation, they
+	// are purely to specify the timespec
+	for i := 0; i < len(m.Body.List); i++ {
+		assign, ok := m.Body.List[i].(*AssignStmt)
+		if !ok {
+			continue
+		}
+		switch strings.ToUpper(assign.Lhs.Name.Name) {
+		case "TIME", "LENGTH", "SAVPER", "DT":
+			m.Body.List = append(m.Body.List[:i], m.Body.List[i+1:]...)
+			i--
+		}
+	}
+
+	rhs.Elts = append(rhs.Elts, &KeyValueExpr{Key: id("start"), Value: floatLit(spec.Start)})
+	rhs.Elts = append(rhs.Elts, &KeyValueExpr{Key: id("end"), Value: floatLit(spec.End)})
+	rhs.Elts = append(rhs.Elts, &KeyValueExpr{Key: id("dt"), Value: floatLit(spec.DT)})
+	rhs.Elts = append(rhs.Elts, &KeyValueExpr{Key: id("save_step"), Value: floatLit(spec.SaveStep)})
+
+	m.Body.List = append(m.Body.List, ts)
+
+	return nil
 }
 
 func (p *dynParser) stmtInto(m *ModelDecl) {
 	typeTok := p.lex.Token()
 	typeTok.val = strings.ToUpper(typeTok.val)
 	switch typeTok.val {
-	case "L", "N", "C", "R", "A", "T":
+	case "L", "N", "C", "R", "A":
 		decl, ok := p.varDecl(typeTok)
 		if !ok || !p.consumeEqual() {
 			p.discardStmt()
@@ -88,15 +167,36 @@ func (p *dynParser) stmtInto(m *ModelDecl) {
 			p.discardStmt()
 			return
 		}
-		assign := &AssignStmt{Lhs: decl, Rhs: expr}
-		m.Body.List = append(m.Body.List, assign)
+		m.Body.List = append(m.Body.List, &AssignStmt{Lhs: decl, Rhs: expr})
+	case "T":
+		decl, ok := p.varDecl(typeTok)
+		if !ok || !p.consumeEqual() {
+			p.discardStmt()
+			return
+		}
+		expr, ok := p.tableDef()
+		if !ok {
+			p.discardStmt()
+			return
+		}
+		m.Body.List = append(m.Body.List, &AssignStmt{Lhs: decl, Rhs: expr})
 	default:
 		p.errorf(typeTok, "unknown type: %s", typeTok.val)
 	}
 }
 
 func (p *dynParser) expr() (Expr, bool) {
-	fmt.Printf("expr\n")
+	switch tok := p.lex.Token(); tok.kind {
+	case itemNumber:
+		return &BasicLit{tok.pos, token.FLOAT, tok.val}, true
+	default:
+		fmt.Printf("expr\n")
+		return nil, false
+	}
+}
+
+func (p *dynParser) tableDef() (Expr, bool) {
+	p.errorf(p.lex.Token(), "tables not supported yet")
 	return nil, false
 }
 
