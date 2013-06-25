@@ -21,3 +21,9 @@ A	DM.K=MIN((1/OMN,(1/AM.K)))
 NOTE
 NOTE	Business Sector
 NOTE
+
+NOTE
+NOTE   control cards
+NOTE
+C      LENGTH=250
+C      DT=5

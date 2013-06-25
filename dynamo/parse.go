@@ -90,6 +90,10 @@ outer:
 	p.f.Decls = append(p.f.Decls, m)
 }
 
+func floatLitS(t Token) *BasicLit {
+	return &BasicLit{t.pos, token.FLOAT, t.val}
+}
+
 func floatLit(f float64) *BasicLit {
 	// FIXME: be more precise or something
 	return &BasicLit{Kind: token.FLOAT, Value: fmt.Sprintf("%f", f)}
@@ -196,8 +200,26 @@ func (p *dynParser) expr() (Expr, bool) {
 }
 
 func (p *dynParser) tableDef() (Expr, bool) {
-	p.errorf(p.lex.Token(), "tables not supported yet")
-	return nil, false
+	table := new(TableFwdExpr)
+outer:
+	for {
+		tok := p.lex.Token()
+		if tok.kind != itemNumber {
+			p.errorf(tok, "expected float literal in table def, not '%s'", tok.val)
+			return nil, true
+		}
+		table.Ys = append(table.Ys, floatLitS(tok))
+
+		switch tok = p.lex.Token(); {
+		case tok.val == "/":
+			break // discard
+		case tok.kind == itemSemi || tok.kind == itemEOF:
+			break outer
+		default:
+			p.errorf(tok, "expected '/' in table def, not '%s'", tok.val)
+		}
+	}
+	return table, false
 }
 
 // discard everything before the next EOF or semi

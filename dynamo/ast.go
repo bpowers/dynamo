@@ -272,6 +272,10 @@ type (
 		Pairs  []*PairExpr // function arguments; or nil
 		Rbrack token.Pos
 	}
+
+	TableFwdExpr struct {
+		Ys []*BasicLit
+	}
 )
 
 // A type is represented by a tree consisting of one
@@ -311,6 +315,7 @@ func (x *UnaryExpr) Pos() token.Pos     { return x.OpPos }
 func (x *BinaryExpr) Pos() token.Pos    { return x.X.Pos() }
 func (x *PairExpr) Pos() token.Pos      { return x.X.Pos() }
 func (x *TableExpr) Pos() token.Pos     { return x.Lbrack }
+func (x *TableFwdExpr) Pos() token.Pos  { return x.Ys[0].Pos() }
 func (x *UnitExpr) Pos() token.Pos      { return x.X.Pos() }
 func (x *KeyValueExpr) Pos() token.Pos  { return x.Key.Pos() }
 func (x *ModelType) Pos() token.Pos     { return x.Model }
@@ -327,6 +332,7 @@ func (x *CallExpr) End() token.Pos      { return x.Rparen + 1 }
 func (x *UnaryExpr) End() token.Pos     { return x.X.End() }
 func (x *BinaryExpr) End() token.Pos    { return x.Y.End() }
 func (x *TableExpr) End() token.Pos     { return x.Rbrack + 1 }
+func (x *TableFwdExpr) End() token.Pos  { return x.Ys[len(x.Ys)-1].End() }
 func (x *PairExpr) End() token.Pos      { return x.Y.End() }
 func (x *UnitExpr) End() token.Pos      { return x.Unit.End() }
 func (x *KeyValueExpr) End() token.Pos  { return x.Value.End() }
@@ -347,6 +353,7 @@ func (*CallExpr) exprNode()     {}
 func (*UnaryExpr) exprNode()    {}
 func (*BinaryExpr) exprNode()   {}
 func (*TableExpr) exprNode()    {}
+func (*TableFwdExpr) exprNode() {}
 func (*PairExpr) exprNode()     {}
 func (*UnitExpr) exprNode()     {}
 func (*KeyValueExpr) exprNode() {}
