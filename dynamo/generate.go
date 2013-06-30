@@ -288,13 +288,14 @@ func (g *generator) table(name string, e Expr) error {
 func (g *generator) expr(name string, expr Expr) {
 	var eqn string
 	switch g.curr.Vars[name].Type {
+	case runtime.TyConst:
+		g.initial(name, expr)
+		eqn := fmt.Sprintf(`s.Next["%s"] = s.Curr["%s"]`, name, name)
+		g.curr.Stocks = append(g.curr.Stocks, eqn)
 	case runtime.TyAux:
 		if isConst(expr) {
 			g.initial(name, expr)
-			// XXX: for dynamo, only update G constants
-			// every timestep
-			// TODO: G consts
-			//eqn = fmt.Sprintf(`s.Curr["%s"] = c.Data(s, "%s")`, name, name)
+			eqn = fmt.Sprintf(`s.Curr["%s"] = c.Data(s, "%s")`, name, name)
 			g.curr.UseCoordFlows = true
 		} else {
 			eqn = fmt.Sprintf(`s.Curr["%s"] = %s`, name, expr)

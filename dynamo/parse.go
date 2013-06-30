@@ -239,7 +239,7 @@ func typeIdent(typeTok Token) *Ident {
 	case "N":
 		n = "initial"
 	case "C":
-		n = "constant"
+		n = "const"
 	case "R":
 		n = "flow"
 	case "A":
