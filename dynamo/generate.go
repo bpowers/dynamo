@@ -124,10 +124,7 @@ func (g *generator) declList(list []Decl) {
 func constEval(e Expr) (v float64, err error) {
 	// if we're wrapped in units, remove them.  Unit safety is a
 	// separate issue.
-	switch r := e.(type) {
-	case *UnitExpr:
-		e = r.X
-	}
+	e = stripUnits(e)
 	basic, ok := e.(*BasicLit)
 	if !ok {
 		err = fmt.Errorf("val %T not BasicLit", e)
@@ -194,11 +191,8 @@ func (g *generator) initial(name string, expr Expr) (err error) {
 		init := fmt.Sprintf(`%f`, val)
 		g.curr.Initials[name] = init
 	} else {
-		unitExpr, ok := expr.(*UnitExpr)
-		if !ok {
-			return fmt.Errorf("initial(%s): not unitexpr", name)
-		}
-		switch e := unitExpr.X.(type) {
+		expr := stripUnits(expr)
+		switch e := expr.(type) {
 		case *RefExpr:
 			if _, ok := g.curr.Vars[e.Ident.Name]; ok {
 				init := fmt.Sprintf(`s.Curr["%s"]`, e.Name)
@@ -210,7 +204,7 @@ func (g *generator) initial(name string, expr Expr) (err error) {
 			}
 		default:
 			err = fmt.Errorf("initial(%s): non-const %v (%T)",
-				name, unitExpr.X, unitExpr.X)
+				name, expr, expr)
 		}
 	}
 	return
@@ -254,10 +248,7 @@ func (g *generator) table(name string, e Expr) error {
 
 	// if we're wrapped in units, remove them.  Unit safety is a
 	// separate issue.
-	switch r := e.(type) {
-	case *UnitExpr:
-		e = r.X
-	}
+	e = stripUnits(e)
 
 	switch r := e.(type) {
 	case *TableExpr:
@@ -300,7 +291,10 @@ func (g *generator) expr(name string, expr Expr) {
 	case runtime.TyAux:
 		if isConst(expr) {
 			g.initial(name, expr)
-			eqn = fmt.Sprintf(`s.Curr["%s"] = c.Data(s, "%s")`, name, name)
+			// XXX: for dynamo, only update G constants
+			// every timestep
+			// TODO: G consts
+			//eqn = fmt.Sprintf(`s.Curr["%s"] = c.Data(s, "%s")`, name, name)
 			g.curr.UseCoordFlows = true
 		} else {
 			eqn = fmt.Sprintf(`s.Curr["%s"] = %s`, name, expr)
@@ -359,6 +353,16 @@ var (
 	identTable = Ident{Name: "table"}
 )
 
+// stripUnits returns the child of rhs if rhs is a UnitExpr, and
+// returns rhs otherwise.
+func stripUnits(rhs Expr) Expr {
+	switch r := rhs.(type) {
+	case *UnitExpr:
+		rhs = r.X
+	}
+	return rhs
+}
+
 // resolveType has two uses - if a decl was given an explicit type, it
 // verifies this matches the type of the rhs expression.  If a decl
 // doesn't have an explicit type, it figures out the implicit type
@@ -371,10 +375,7 @@ func resolveType(d *VarDecl, rhs Expr) error {
 
 	// if we're wrapped in units, remove them.  Unit safety is a
 	// separate issue.
-	switch r := rhs.(type) {
-	case *UnitExpr:
-		rhs = r.X
-	}
+	rhs = stripUnits(rhs)
 
 	switch r := rhs.(type) {
 	case *TableExpr:
