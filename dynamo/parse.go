@@ -199,6 +199,28 @@ func (p *dynParser) expr() (Expr, bool) {
 	}
 }
 
+func (p *dynParser) term() (Expr, bool) {
+	return nil, false
+}
+
+func (p *dynParser) factor() (Expr, bool) {
+	return nil, false
+}
+
+func (p *dynParser) ident() (Expr, bool) {
+	return nil, false
+}
+
+func (p *dynParser) num() (Expr, bool) {
+	switch tok := p.lex.Token(); tok.kind {
+	case itemNumber:
+		return &BasicLit{tok.pos, token.FLOAT, tok.val}, true
+	default:
+		fmt.Printf("expr\n")
+		return nil, false
+	}
+}
+
 func (p *dynParser) tableDef() (Expr, bool) {
 	table := new(TableFwdExpr)
 outer:
